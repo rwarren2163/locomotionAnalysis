@@ -475,7 +475,15 @@ PlotRegions3D(RPCoords, 10, [1.0, 0.43, 0.54], xrange, yrange);
 
 
 
+%% running plotting function on GPU
 
+fn = fieldnames(brain);
+for k=1:numel(fn)
+    if( isnumeric(brain.(fn{k})) )
+        brain.(fn{k}) = uint32(brain.(fn{k}));
+        
+    end
+end
 
 
 

@@ -10,7 +10,7 @@ warning('on')
 ephysHistoInfo.session = session;
 ephysHistoInfo.mouseID = ephysInfo.mouse{strcmp(ephysInfo.session, session)};
 ephysHistoInfo.probeFinalDepth = ephysInfo.depth(strcmp(ephysInfo.session, session));
-ephysHistoInfo.mapFile = ephysInfo.probeID{strcmp(ephysInfo.session, session)};
+ephysHistoInfo.mapFile = ephysInfo.map{strcmp(ephysInfo.session, session)};
 ephysHistoInfo.mapFilePath = fullfile(getenv('OBSDATADIR'), 'ephys', 'channelMaps', 'kilosort', [ephysHistoInfo.mapFile, '.mat']);
 
 % get probe info of the session
@@ -23,7 +23,6 @@ for i = 1:ephysHistoInfo.channelNum
     ephysHistoInfo.shankNum(1, i) = kcoords(channelNum_OpenEphys(i)); % channel number order matches probe physcial layout
     ephysHistoInfo.channelDepth(1, i) = ycoords(channelNum_OpenEphys(i)); % channel number order matches probe physical layout
 end
-
 
 end
 

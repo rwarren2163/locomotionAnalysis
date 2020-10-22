@@ -1,10 +1,10 @@
 %% import tiff stack mask files
-mouseID = 'cmu3';
+mouseID = 'cer11';
 folder = fullfile(getenv('OBSDATADIR'), 'histology', mouseID, 'TiffStack');
 files = dir(fullfile(folder, '*.tif'));
 
-downsampleRate = 0.3;
-thickness = 50;
+downsampleRate = 0.2;
+thickness = 60;
 
 includeDentate = true;
 includeInt = true;
@@ -16,28 +16,37 @@ saveFiles = true;
 % brain regions
 if includeInt
     disp('Reformatting Int...');
-    brain.RICoords = importTiffStack(fullfile(folder, 'InterpositusRight.tif'), downsampleRate, thickness);
-    brain.LICoords = importTiffStack(fullfile(folder, 'InterpositusLeft.tif'), downsampleRate, thickness);
+    [brainRegions.RI, brainXYZCoords.RICoords] = importTiffStack_2(fullfile(folder, 'InterpositusRight.tif'), 'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+    [brainRegions.LI, brainXYZCoords.LICoords] = importTiffStack_2(fullfile(folder, 'InterpositusLeft.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
 end
 
 if includeDentate
     disp('Reformatting Dentate...');
-    brain.LDCoords = importTiffStack(fullfile(folder, 'DentateLeft.tif'), downsampleRate, thickness);
-    brain.RDCoords = importTiffStack(fullfile(folder, 'DentateRight.tif'), downsampleRate, thickness);
+    [brainRegions.LD, brainXYZCoords.LDCoords] = importTiffStack_2(fullfile(folder, 'DentateLeft.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+    [brainRegions.RD, brainXYZCoords.RDCoords] = importTiffStack_2(fullfile(folder, 'DentateRight.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
 end
 
 if includeFastigial
     disp('Reformatting Fastigial...');
-    brain.LFCoords = importTiffStack(fullfile(folder, 'FastigialLeft.tif'), downsampleRate, thickness);
-    brain.RFCoords = importTiffStack(fullfile(folder, 'FastigialRight.tif'), downsampleRate, thickness);
+    [brainRegions.LF, brainXYZCoords.LFCoords] = importTiffStack_2(fullfile(folder, 'FastigialLeft.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+    [brainRegions.RF, brainXYZCoords.RFCoords] = importTiffStack_2(fullfile(folder, 'FastigialRight.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
 end
 
 if includePCL_and_BS
     disp('Reformatting PC Layer and Brain Surface...');
-    brain.RPCLCoords = importTiffStack(fullfile(folder, 'PCLayerRight.tif'), downsampleRate, thickness);
-    brain.RBSCoords = importTiffStack(fullfile(folder, 'BrainSurfaceRight.tif'), downsampleRate, thickness);
-    brain.LPCLCoords = importTiffStack(fullfile(folder, 'PCLayerLeft.tif'), downsampleRate, thickness);
-    brain.LBSCoords = importTiffStack(fullfile(folder, 'BrainSurfaceLeft.tif'), downsampleRate, thickness);
+    [~, brainXYZCoords.RPCLCoords] = importTiffStack_2(fullfile(folder, 'PCLayerRight.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+    [~, brainXYZCoords.RBSCoords] = importTiffStack_2(fullfile(folder, 'BrainSurfaceRight.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+    [~, brainXYZCoords.LPCLCoords] = importTiffStack_2(fullfile(folder, 'PCLayerLeft.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+    [~, brainXYZCoords.LBSCoords] = importTiffStack_2(fullfile(folder, 'BrainSurfaceLeft.tif'),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');
+end
+
+% turn brain structure to unsigned int 32, in order to save more space, and
+% potentially faster to plot.
+fn = fieldnames(brainXYZCoords);
+for k=1:numel(fn)
+    if( isnumeric(brainXYZCoords.(fn{k})) )
+        brainXYZCoords.(fn{k}) = uint32(brainXYZCoords.(fn{k}));   
+    end
 end
 
 
@@ -49,99 +58,122 @@ probe = struct();
 
 for i = 1:length(probeFiles)
     probe(i).name = probeFiles(i).name(1:end-4);
-    probe(i).coords = importTiffStack(fullfile(folder, probeFiles(i).name), downsampleRate, thickness);   
+    [probe(i).traces, probe(i).coords] = importTiffStack_2(fullfile(folder, probeFiles(i).name),  'scaling', downsampleRate, 'thickness', thickness, 'dataType', 'logical');   
     probe(i).isDiI = 1;
+    
+    if contains(probe(i).name, 'ProbeLeft')
+        probe(i).side = 'left';
+    else
+        probe(i).side = 'right';    
+    end
 end
 
 
 resultsFolder = fullfile(getenv('OBSDATADIR'), 'histology', mouseID, 'Reconstruction');
 if saveFiles
-    save(fullfile(resultsFolder, 'brain.mat' ), 'brain');
+    save(fullfile(resultsFolder, 'brainXYZCoords.mat' ), 'brainXYZCoords');
+    save(fullfile(resultsFolder, 'brainRegions.mat' ), 'brainRegions');
     save(fullfile(resultsFolder, 'probe.mat' ), 'probe');
+    disp('File Saved!');
 end
 disp('All Done!');
 
 
 
 %% Plot brain regions + probe traces
-mouseID = 'cer18';
+mouseID = 'cer11';
 resultsFolder = fullfile('Z:\obstacleData\histology', mouseID, 'Reconstruction');
-load(fullfile(resultsFolder, 'brain.mat'))
-load(fullfile(resultsFolder, 'probe.mat'))
+load(fullfile(resultsFolder, 'brainXYZCoords.mat'));
+load(fullfile(resultsFolder, 'brainRegions.mat'));
+load(fullfile(resultsFolder, 'probe.mat'));
+
+%% Plot!!
 
 figure('Color', 'white', 'position', get(0,'ScreenSize'));
 
-showDentate = true;
-showInt = true;
-showFastigial = true;
-showPCL_and_BS = true;
+plot_PC_BS = true;
 
+sideToShow = 'both';
 
-xrange = [0, max(brain.LICoords(:, 1))*2.5];
-yrange = [0, max(brain.LICoords(:, 2))+500]; % +60 just for visualizing purposes
-
-markerSize = 20;
+regionFn = fieldnames(brainRegions);
+coordsFn = fieldnames(brainXYZCoords);
+switch sideToShow
+    case 'left'
+        inds = find(contains(regionFn, 'L'));
+        for i = 1:length(inds)
+            plotRegions3D_2(brainRegions.(regionFn{inds(i)}), brainXYZCoords.(coordsFn{inds(i)}), 'method', 'convhull'); hold on;
+        end
+        
+%         inds = find(strcmp({probe.side}, 'left'));
+%         for i = 1:length(inds)
+%             plotRegions3D_2(probe(inds(i)).traces, probe(inds(i)).coords); hold on
+%         end
+        
+    case 'right'
+        inds = find(contains(regionFn, 'R'));
+        for i = 1:length(inds)
+            plotRegions3D_2(brainRegions.(regionFn{inds(i)}), brainXYZCoords.(coordsFn{inds(i)}), 'method', 'convhull'); hold on;
+        end   
+        
+%         inds = find(strcmp({probe.side}, 'right'));
+%         for i = 1:length(inds)
+%             plotRegions3D_2(probe(inds(i)).traces, probe(inds(i)).coords); hold on
+%         end
+        
+    case 'both'
+        for i = 1:length(regionFn)
+            plotRegions3D_2(brainRegions.(regionFn{i}), brainXYZCoords.(coordsFn{i}),'method', 'convhull'); hold on;
+        end
+        
+%         for i = 1:size(probe, 2)
+%             plotRegions3D_2(probe(i).traces, probe(i).coords); hold on
+%         end
+end
 
 PCL_color = [0.82, 0.56, 0.97];
 BS_color = [0.8 0.8 0.8];
-Int_color = [1, 0.74, 0.35];
-Fastigial_color = [0.39, 0.83, 0.075];
-Dentate_color = [0.3176, 0.8314, 0.9608];
-Probe_color = [1.0, 0.43, 0.54];
-
-transparency = 0.1;
-
-if showPCL_and_BS
-    plotRegions3D(brain.LBSCoords, markerSize, BS_color, xrange, yrange, transparency); hold on
-    plotRegions3D(brain.RBSCoords, markerSize, BS_color, xrange, yrange, transparency);
-    plotRegions3D(brain.LPCLCoords, markerSize, PCL_color, xrange, yrange, transparency);
-    plotRegions3D(brain.RPCLCoords, markerSize, PCL_color, xrange, yrange, transparency);
+if plot_PC_BS
+    switch sideToShow
+        case 'left'
+            plotRegions3D(brainXYZCoords.LPCLCoords, 'color', PCL_color, 'selected', [false, true, false], 'selectedInds', [600, 1200]);
+            %  'selected', [false, true, false], 'selectedInds', [700, 1400]
+            plotRegions3D(brainXYZCoords.LBSCoords, 'color', BS_color);
+        case 'right'
+            plotRegions3D(brainXYZCoords.RPCLCoords, 'color', PCL_color,  'selected', [false, true, false], 'selectedInds', [800, 1500]);
+            plotRegions3D(brainXYZCoords.RBSCoords, 'color', BS_color);
+        case 'both'
+            plotRegions3D(brainXYZCoords.LPCLCoords, 'color', PCL_color,  'selected', [false, true, false], 'selectedInds', [200, 1200]);
+            plotRegions3D(brainXYZCoords.LBSCoords, 'color', BS_color);
+            plotRegions3D(brainXYZCoords.RPCLCoords, 'color', PCL_color,  'selected', [false, true, false], 'selectedInds', [200, 1200]);
+            plotRegions3D(brainXYZCoords.RBSCoords, 'color', BS_color);
+    end
 end
+            
 
-
-if showInt
-    plotRegions3D(brain.LICoords, markerSize, Int_color, xrange, yrange, transparency);
-    plotRegions3D(brain.RICoords, markerSize, Int_color, xrange, yrange, transparency);
-end
-
-
-if showDentate
-    plotRegions3D(brain.LDCoords, markerSize, Dentate_color, xrange, yrange, transparency);
-    plotRegions3D(brain.RDCoords, markerSize, Dentate_color, xrange, yrange, transparency);
-end
-
-if showFastigial
-    plotRegions3D(brain.LFCoords, markerSize, Fastigial_color, xrange, yrange, transparency);
-    plotRegions3D(brain.RFCoords, markerSize, Fastigial_color, xrange, yrange, transparency);    
-end
-
-diI_inds = find([probe.isDiI]);
-for i = 1:length(diI_inds)
-    
-    plotRegions3D(probe(diI_inds(i)).coords, markerSize, Probe_color, xrange, yrange, transparency);
-    
-end
-
-
-
-
-view(3)
-
-
-title('3D Plot of Traced Features');
-
+title('3D Plot of Traced Brain Features');
+daspect([1, 1, 1]);
+grid on
 
 %% fit a line for the probe traces
 
-diI_inds = find([probe.isDiI]); 
-for i = 1:length(diI_inds)
 
+switch sideToShow
+    case 'left'
+        diI_inds = find([probe.isDiI] & strcmp({probe.side}, 'left'));       
+    case 'right'
+        diI_inds = find([probe.isDiI] & strcmp({probe.side}, 'right'));
+    case 'both'
+        diI_inds = find([probe.isDiI]);
+end
+        
+
+
+for i = 1:length(diI_inds)
     probe(diI_inds(i)).LM = LinearFit(probe(diI_inds(i)).coords);
-    
     if contains(probe(diI_inds(i)).name, 'ProbeLeft')
         probe(diI_inds(i)).side = 'left';
     else
-        probe(diI_inds(i)).side = 'right';    
+        probe(diI_inds(i)).side = 'right';
     end
     
     switch probe(diI_inds(i)).name(end)
@@ -152,17 +184,16 @@ for i = 1:length(diI_inds)
         case 'M'
             probe(diI_inds(i)).shankNum = 3;
     end
-    
 end
+
 
 
 
 %% AddPoints: For probes with DiI, calculate brain surface cross points and PC layer cross points
 %  For probes with DiI, add good channel points 
 
-mouseID = 'cer18';
 
-disp('getting sessions for this mouse...');
+disp('getting sessions for the mouse...');
 warning('off', 'MATLAB:table:ModifiedAndSavedVarnames')
 ephysInfo = readtable(fullfile(getenv('OBSDATADIR'), 'spreadSheets', 'ephysInfo.xlsx'), 'Sheet', 'ephysInfo');
 warning('on', 'MATLAB:table:ModifiedAndSavedVarnames')
@@ -177,17 +208,40 @@ end
 
 % plot BS_crossPoints, GC_crossPoints and good channels on the 3D map
 % temporarily use 
+switch sideToShow
+    case 'left'
+        diI_inds = find([probe.isDiI] & strcmp({probe.side}, 'left'));
+    case 'righ'
+        diI_inds = find([probe.isDiI] & strcmp({probe.side}, 'right'));
+    case 'both'
+        diI_inds = find([probe.isDiI]);
+end
+        
+
+
 for i = 1:length(diI_inds)
     
     if strcmp(probe(diI_inds(i)).side, 'left')
-        [probe(diI_inds(i)).BS_crossPoints, probe(diI_inds(i)).PC_crossPoints, probe(diI_inds(i)).GC_points] = ...
-            addPointsToProbe(probe(diI_inds(i)).session, probe(diI_inds(i)).LM, brain.LBSCoords, probe(diI_inds(i)).shankNum);
+        [probe(diI_inds(i)).BS_crossPoints, probe(diI_inds(i)).PC_crossPoints, probe(diI_inds(i)).GC_points, probe(diI_inds(i)).GC_ids] = ...
+            addPointsToProbe(probe(diI_inds(i)).session, probe(diI_inds(i)).LM, double(brainXYZCoords.LBSCoords), probe(diI_inds(i)).shankNum);
     elseif strcmp(probe(diI_inds(i)).side, 'right')
-        [probe(diI_inds(i)).BS_crossPoints, probe(diI_inds(i)).PC_crossPoints, probe(diI_inds(i)).GC_points] = ...
-            addPointsToProbe(probe(diI_inds(i)).session, probe(diI_inds(i)).LM, brain.RBSCoords, probe(diI_inds(i)).shankNum);
+        [probe(diI_inds(i)).BS_crossPoints, probe(diI_inds(i)).PC_crossPoints, probe(diI_inds(i)).GC_points, probe(diI_inds(i)).GC_ids] = ...
+            addPointsToProbe(probe(diI_inds(i)).session, probe(diI_inds(i)).LM, double(brainXYZCoords.RBSCoords), probe(diI_inds(i)).shankNum);
     end
 
 end
+
+
+
+%% Save the current probe files
+
+resultsFolder = fullfile(getenv('OBSDATADIR'), 'histology', mouseID, 'Reconstruction');
+
+save(fullfile(resultsFolder, 'brainXYZCoords.mat' ), 'brainXYZCoords');
+save(fullfile(resultsFolder, 'brainRegions.mat' ), 'brainRegions');
+save(fullfile(resultsFolder, 'probe.mat' ), 'probe');
+
+disp('File Saved!');
 
 
 
@@ -196,7 +250,7 @@ end
 % ------------------------- settings -------------------------------------
 % HistoCoords DiI (get from probe structure)
 temp = struct2table(probe(logical([probe.isDiI])));
-histoPoints = table(temp.name, temp.BS_crossPoints(:, 1:2), 'VariableNames', {'HistoProbeNames', 'HistoCoords'}); 
+histoPoints = table(temp.name, temp.BS_crossPoints(:, 1:2), temp.shankNum, 'VariableNames', {'HistoProbeNames', 'HistoCoords', 'shank'}); 
 
 % ManipulatorCoords (get from ephysInfo spreadsheet)
 warning('off', 'MATLAB:table:ModifiedAndSavedVarnames')
@@ -207,6 +261,7 @@ ManipuProbeNames = ephysInfo.DiINotes((strcmp(mouseID, ephysInfo.mouse)));
 ManipuCoords = [ephysInfo.locationML( (strcmp(mouseID, ephysInfo.mouse))), ephysInfo.locationAP( (strcmp(mouseID, ephysInfo.mouse)))];
 manipuPoints = table(ManipuProbeNames, ManipuCoords, 'VariableNames', {'ManipuProbeNames', 'ManipuCoords'});
 
+%% Save histoPoints and manipuPoints
 % Please review and modify these coordinates manually! Then SAVE IT!
 saveFiles = true;
 resultsFolder = fullfile(getenv('OBSDATADIR'), 'histology', mouseID, 'Reconstruction');
@@ -216,28 +271,52 @@ if saveFiles
 end
 disp('File saved!');
 
+%% Load histoPoints and manipuPoints
+
+resultsFolder = fullfile(getenv('OBSDATADIR'), 'histology', mouseID, 'Reconstruction');
+
+load(fullfile(resultsFolder, 'histoPoints.mat'));
+load(fullfile(resultsFolder, 'manipuPoints.mat'));
+
+
+%%
 % --------------------------- processing ----------------------------------
 % plot to verify the histo info
+
+
+% !!! Manul work needed before running the code below
+% !!! Organize the manipuPoints first
 noDiI_inds = contains(manipuPoints.ManipuProbeNames, 'noDiI');
 diI_inds = contains(manipuPoints.ManipuProbeNames, 'Probe');
+manipuPoints_LM = manipuPoints(diI_inds, :);
+histoPoints_LM = table();
+for i = 1:size(manipuPoints(diI_inds, :), 1)
+    temp = manipuPoints_LM.ManipuProbeNames(i);
+    histoPoints_LM(i, :) = histoPoints(strcmp(histoPoints.HistoProbeNames, temp), :);    
+end
 
-figure;
+
+
+figure('Color', 'white', 'position', get(0,'ScreenSize'));
 plot(manipuPoints.ManipuCoords(diI_inds, 1), manipuPoints.ManipuCoords(diI_inds, 2), '.r', 'MarkerSize', 10);
 hold on
 plot(manipuPoints.ManipuCoords(noDiI_inds, 1), manipuPoints.ManipuCoords(noDiI_inds, 2), '.m', 'MarkerSize', 10);
 plot(histoPoints.HistoCoords(:, 1), histoPoints.HistoCoords(:, 2), '.b', 'MarkerSize', 20);
 
-mdlML_test = fitlm(manipuPoints.ManipuCoords(diI_inds, 1)*1000, histoPoints.HistoCoords(:, 1))
-mdlAP_test = fitlm(manipuPoints.ManipuCoords(diI_inds, 2)*1000, histoPoints.HistoCoords(:, 2))
 
-% fit the LM
-fittedML_nodii = predict(mdlML_test, manipuPoints.ManipuCoords(noDiI_inds, 1)*1000);
-fittedAP_nodii = predict(mdlAP_test, manipuPoints.ManipuCoords(noDiI_inds, 2)*1000);
+mdlML_test = fitlm(manipuPoints_LM.ManipuCoords(:, 1), histoPoints_LM.HistoCoords(:, 1))
+mdlAP_test = fitlm(manipuPoints_LM.ManipuCoords(:, 2), histoPoints_LM.HistoCoords(:, 2))
+
+
+fittedML_nodii = predict(mdlML_test, manipuPoints.ManipuCoords(noDiI_inds, 1));
+fittedAP_nodii = predict(mdlAP_test, manipuPoints.ManipuCoords(noDiI_inds, 2));
 
 % plot the fitted entry points for ni dii tracks
 hold on
 plot(fittedML_nodii, fittedAP_nodii, '.', 'MarkerSize', 20, 'Color', [1 0.74 0.35])
 legend('manipulator coordinates (DiI)', 'manipulator coordinates (noDiI)', 'histo points (DiI)', 'predicted no DiI points');
+xlabel('ML axis');
+ylabel('AP axis');
 
 %% for ni dii tracks, reconstructing no-dii probe traces in 3d view
 
@@ -248,6 +327,9 @@ for i = 1:length(dirV)
     if dirV(i, 3) < 0; dirV(i, :) = -dirV(i, :); end
 end
 nodiiLM.dirV = mean(dirV);
+
+% Before running the code below, please double check that the noDiI entries
+% in the manipuPoints have been splitted into the left and right traces.
 
 noDiI_inds = find(contains(manipuPoints.ManipuProbeNames, 'noDiI'));
 L = sum([probe.isDiI]);
@@ -262,7 +344,7 @@ for i = 1:length(noDiI_inds)
     probe(L+i).GC_points = [];
     
     tempLM = struct();
-    tempLM.BS_crossPoints = [fittedML_nodii(noDiI_inds(i)), fittedAP_nodii(noDiI_inds(i))];
+    tempLM.BS_crossPoints = [fittedML_nodii(i), fittedAP_nodii(i)];
     tempLM.dirV = mean(dirV);
     probe(L+i).LM = tempLM;
     
@@ -280,31 +362,28 @@ for i = 1:length(noDiI_inds)
 end
 
 noDiI_inds = find([probe.isDiI] == 0);
-for i = 1:length(noDiI_inds)
+for i = 1:2
     
     if strcmp(probe(noDiI_inds(i)).side, 'right')
-        [probe(noDiI_inds(i)).BS_crossPoints, probe(noDiI_inds(i)).PC_crossPoints, probe(noDiI_inds(i)).GC_points] = ...
-            addPointsToProbe(probe(noDiI_inds(i)).session, probe(noDiI_inds(i)).LM, brain.RBSCoords, probe(noDiI_inds(i)).shankNum,...
+        [probe(noDiI_inds(i)).BS_crossPoints, probe(noDiI_inds(i)).PC_crossPoints, probe(noDiI_inds(i)).GC_points, probe(noDiI_inds(i)).GC_ids] = ...
+            addPointsToProbe(probe(noDiI_inds(i)).session, probe(noDiI_inds(i)).LM, brainXYZCoords.RBSCoords, probe(noDiI_inds(i)).shankNum,...
             {'noDiIMode', true, 'showGCPoints', true});
     elseif strcmp(probe(noDiI_inds(i)).side, 'left')
-         [probe(noDiI_inds(i)).BS_crossPoints, probe(noDiI_inds(i)).PC_crossPoints, probe(noDiI_inds(i)).GC_points] = ...
-            addPointsToProbe(probe(noDiI_inds(i)).session, probe(noDiI_inds(i)).LM, brain.LBSCoords, probe(noDiI_inds(i)).shankNum,...
+         [probe(noDiI_inds(i)).BS_crossPoints, probe(noDiI_inds(i)).PC_crossPoints, probe(noDiI_inds(i)).GC_points, probe(noDiI_inds(i)).GC_ids] = ...
+            addPointsToProbe(probe(noDiI_inds(i)).session, probe(noDiI_inds(i)).LM, brainXYZCoords.LBSCoords, probe(noDiI_inds(i)).shankNum,...
             {'noDiIMode', true, 'showGCPoints', true});       
     end
     
 end
 
-saveFiles = true;
+%% save probe.mat (final version, containing both DiI and no DiI info)
 resultsFolder = fullfile(getenv('OBSDATADIR'), 'histology', mouseID, 'Reconstruction');
+saveFiles = true;
 if saveFiles
-    save(fullfile(resultsFolder, 'probe.mat' ));
+    save(fullfile(resultsFolder, 'probe_final.mat' ), 'probe');
 end
-disp('Probe.mat Saved!');
+disp('probe_final.mat saved!');
 
-
-%% Save & Update data to ephysHistoTable
-
-mouseID = 'cer18';
 
 temp = struct2table(probe);
 
@@ -315,18 +394,20 @@ newEphysHistoTable.side = temp.side;
 newEphysHistoTable.probeName = temp.name;
 newEphysHistoTable.isDiI = temp.isDiI;
 for i = 1:height(newEphysHistoTable)
-    newEphysHistoTable.probeID(i) = ephysInfo.probeID(strcmp(ephysInfo.session, temp.session(i)));
+    newEphysHistoTable.probeMap(i) = ephysInfo.map(strcmp(ephysInfo.session, temp.session(i)) &...
+                                                   strcmp(ephysInfo.mouse, mouseID));
 end
 newEphysHistoTable.shankNum = temp.shankNum;
 newEphysHistoTable.BS_crossPoints = temp.BS_crossPoints;
 newEphysHistoTable.PC_crossPoints = temp.PC_crossPoints;
 newEphysHistoTable.GC_Points = temp.GC_points;
+newEphysHistoTable.GC_ids = temp.GC_ids;
 
 
 % check to update and save ephysHistoData
 fileName = fullfile(getenv('OBSDATADIR'), 'histology', '0_ephysHistoData', 'ephysHistoTable.mat');
 ephysHistoFolder = fullfile(getenv('OBSDATADIR'), 'histology', '0_ephysHistoData');
-if ~exist(fileName)
+if ~exist(fileName, 'file')
     ephysHistoTable = newEphysHistoTable;
     save(fileName, 'ephysHistoTable');
 else
@@ -335,14 +416,17 @@ else
     new = newEphysHistoTable;
     deleteInds = [];
     for i = 1:height(new)
-        overlap = find(strcmp(old.session, new.session(i)) & strcmp(old.probeName, old.name(i)));
-        if any(overlap) & length(overlap) == 1
-            old(overlap) = new(i);
+        overlapInd = find(strcmp(old.session, new.session(i)) & strcmp(old.probeName, new.probeName(i)));
+        if any(overlapInd) && length(overlapInd) == 1
+            old(overlapInd, :) = new(i, :);
             deleteInds = [deleteInds, i];
         end
     end
-    new(deleteInds, :) = [];
     
+    if any(length(deleteInds))
+        new(deleteInds, :) = [];
+    end
+        
     if any(height(new))
         ephysHistoTable = [old; new];
     else

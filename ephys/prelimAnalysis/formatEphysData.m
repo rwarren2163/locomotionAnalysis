@@ -125,11 +125,18 @@ openEphysToSpikeMapping = polyfit(syncEphysTimes, syncSpikeTimes, 1); % get line
 predictedEventSpikeTimes = polyval(openEphysToSpikeMapping, syncEphysTimes);
 
 % check that predictions are accurate
+<<<<<<< HEAD
+predictedEventSpikeTimes = polyval(openEphysToSpikeMapping, syncEphysTimes);
+if max(abs(predictedEventSpikeTimes - syncSpikeTimes)) > .002
+    fprintf('%s: WARNING! Linear mapping from openephys to spike fails to fit all events!\n', session)
+   
+=======
 thresh = .003;  % maximum acceptable difference between predicted and actual event times
 if max(abs(predictedEventSpikeTimes - syncSpikeTimes)) > thresh
     fprintf('%s: WARNING! %i predicted event times are more than %i ms off! Mapping may have failed!\n', ...
         session, sum(abs(predictedEventSpikeTimes - syncSpikeTimes) > thresh), thresh*1000)
 %     disp(predictedEventSpikeTimes - syncSpikeTimes)  % try the following line to see if the predicted times are really off or within an acceptible range
+>>>>>>> 403084717706e379fe39f1524671ab0c3297bcb6
 end
     
 

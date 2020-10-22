@@ -70,4 +70,7 @@ xInds = xWiskPos:xWiskPos+size(frameWisk,2)-1;
 yInds = yWiskPosTemp:yWiskPosTemp+size(frameWisk,1)-1;
 frame(yInds, xInds) =  frameWisk;
 
+<<<<<<< HEAD
+=======
 
+>>>>>>> 403084717706e379fe39f1524671ab0c3297bcb6

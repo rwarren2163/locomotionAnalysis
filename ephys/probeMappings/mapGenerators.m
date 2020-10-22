@@ -13,7 +13,8 @@
 % In the plot of each probe map, the circles reflect the physical layout of
 % channels on the probe. The number associated with each circle is the
 % channel number ordered in the probe physical map, whereas the number in
-% the bracket is the corresponding channel number used in openEphys.
+% the bracket is the corresponding channel number used in the names of
+% the openEphys continuous files.
 % Eg: for NeuronexusA4x16-Poly2, channel 1 in the probe physical layout 
 % corresponds to 107_CH42.continuous in the openEphys files.
 
@@ -205,7 +206,7 @@ siteLocations = [sitaLocations_shank1; siteLocations_shank2]; % xy coordinates f
 figure;
 scatter(siteLocations(:,1), siteLocations(:,2))
 for i = 1:size(siteLocations,1)
-    text(siteLocations(i,1), siteLocations(i,2), [num2str(i) ' (' num2str(channelNum_OpenEphys(i)) ')']) 
+    text(siteLocations(i,1), siteLocations(i,2), [num2str(i) ' (' num2str(channelNum_OpenEphys(i)-1) ')']) 
 end
 
 % save the channel map for kilosort
@@ -226,10 +227,53 @@ fs = 30000; % sampling frequency
 
 
 % save the probe map for ASSY77 H2 probe
-save(fullfile(getenv('OBSDATADIR'), 'ephys', 'channelMaps', 'kilosort', 'ASSY77.mat'), ...
+save(fullfile(getenv('OBSDATADIR'), 'ephys', 'channelMaps', 'kilosort', 'ASSY77_H2Probe.mat'), ...
+    'chanMap','channelNum_OpenEphys','connected', 'xcoords', 'ycoords', 'kcoords', 'chanMap0ind', 'fs')
+
+%% NeuroCambridge ASSY-H2-QianyunVersion (32 channel per shank*2)
+
+channelNum_OpenEphys = [38 40 42 45 43 49 34 36 48 35 33 44 46 41 39 37 63 61 60 58 56 54 52 50 47 51 53 55 57 59 62 64 1 3 6 8 10 12 14 16 17 13 11 9 7 5 4 2 28 26 24 19 21 15 32 30 18 29 31 22 20 23 25 27];  
+
+
+% get probe physical layout
+shankSeparation = 250; % The left shank and right shank are separated by 250um.
+y = [775:-25:0]'; % y coordinates for both shanks.
+x = [ones(32, 1), repmat(1 + shankSeparation, 32, 1)]; % x coordinates for left shank and right shank.
+sitaLocations_shank1 = [x(:, 1) y];
+siteLocations_shank2 = [x(:, 2) y];
+siteLocations = [sitaLocations_shank1; siteLocations_shank2]; % xy coordinates for both shanks. dim: Nchannels*Nshank
+
+% plot the probe channel map
+figure;
+scatter(siteLocations(:,1), siteLocations(:,2))
+for i = 1:size(siteLocations,1)
+    text(siteLocations(i,1), siteLocations(i,2), [num2str(i) ' (' num2str(channelNum_OpenEphys(i)-1) ')']) 
+end
+
+% save the channel map for kilosort
+kcoords = [repmat(2, 32, 1); ones(32, 1)]; % dim: Nchannels * 1; 
+Nchannels = 64; 
+connected = true(Nchannels, 1); 
+chanMap = 1:Nchannels; 
+chanMap0ind = chanMap - 1; 
+
+xcoords = nan(Nchannels, 1);
+ycoords = nan(Nchannels, 1);
+for i = 1:Nchannels
+    temp = find(channelNum_OpenEphys == i);
+    xcoords(i) = siteLocations(temp, 1);
+    ycoords(i) = siteLocations(temp, 2);
+end
+fs = 30000; % sampling frequency
+
+
+% save the probe map for ASSY77 H2 probe
+save(fullfile(getenv('OBSDATADIR'), 'ephys', 'channelMaps', 'kilosort', 'ASSY77_H2Probe_QZ.mat'), ...
     'chanMap','channelNum_OpenEphys','connected', 'xcoords', 'ycoords', 'kcoords', 'chanMap0ind', 'fs')
 
 
-
-
+% % save the probe map for ASSY77 H2 probe
+% save(fullfile('D:\DCN_project\Ephys\ASSY_KS1ConfigFile', 'ASSY77_H2.mat'), ...
+%     'chanMap','channelNum_OpenEphys','connected', 'xcoords', 'ycoords', 'kcoords', 'chanMap0ind', 'fs')
+% 
 

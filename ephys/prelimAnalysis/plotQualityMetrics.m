@@ -50,7 +50,7 @@ spkWindowInds = int64((spkWindow(1)/1000*info.fs) : (spkWindow(2)/1000*info.fs))
 load(fullfile(getenv('OBSDATADIR'), 'ephys', 'channelMaps', 'kilosort', [info.mapFile '.mat']), ...
     'xcoords', 'ycoords', 'channelNum_OpenEphys', 'kcoords')
 [allSpkInds, unit_ids] = getGoodSpkInds(session); % get spike times for good units
-bestChannels = getBestChannels(session);
+bestChannels = getBestChannels(session); % Best channels are returned in ChannelNum used in kilosort and phy (intan+1);
 
 
 % plotting all channels
